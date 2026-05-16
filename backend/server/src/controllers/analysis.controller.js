@@ -83,6 +83,22 @@ const runAutoML = async (req, res) => {
 
   const updated = await datasetService.saveAIResult(dataset._id, "automl", aiResult);
 
+  const trainingData = aiResult?.data;
+  if (trainingData?.model_id) {
+    await datasetService.registerModelVersion(dataset._id, {
+      modelId: trainingData.model_id,
+      version: trainingData.model_version || "v1",
+      parentModelId: trainingData.parent_model_id || null,
+      modelType: trainingData.metrics?.model_type || "Unknown",
+      problemType: trainingData.metrics?.problem_type || "unknown",
+      targetColumn,
+      metrics: trainingData.metrics || {},
+      leaderboard: trainingData.metrics?.leaderboard || [],
+      createdAt: new Date(),
+      source: "training",
+    });
+  }
+
   return sendSuccess(res, {
     message: "AutoML training completed",
     data: { datasetId: updated._id, automl: updated.automl },

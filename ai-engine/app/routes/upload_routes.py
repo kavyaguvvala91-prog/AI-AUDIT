@@ -2,8 +2,8 @@
 
 from fastapi import APIRouter, File, UploadFile, status
 
-from app.models.response_models import ErrorResponse, UploadResponse
-from app.services.dataset_service import DatasetService
+from ..models.response_models import ErrorResponse, UploadResponse
+from ..services.dataset_service import DatasetService
 
 
 router = APIRouter(tags=["upload"])

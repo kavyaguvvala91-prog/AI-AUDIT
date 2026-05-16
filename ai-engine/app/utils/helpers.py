@@ -9,7 +9,7 @@ from typing import Any
 import numpy as np
 import pandas as pd
 
-from app.utils.constants import TARGET_COLUMN_KEYWORDS
+from .utils.constants import TARGET_COLUMN_KEYWORDS
 
 
 def utc_timestamp() -> str:

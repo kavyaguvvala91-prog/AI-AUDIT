@@ -8,8 +8,8 @@ from uuid import uuid4
 
 from fastapi import HTTPException, UploadFile, status
 
-from app.utils.constants import SAVED_MODELS_DIR, SUPPORTED_UPLOAD_EXTENSIONS, UPLOADS_DIR
-from app.utils.helpers import utc_timestamp
+from .utils.constants import SAVED_MODELS_DIR, SUPPORTED_UPLOAD_EXTENSIONS, UPLOADS_DIR
+from .utils.helpers import utc_timestamp
 
 
 def ensure_runtime_directories() -> None:

@@ -15,12 +15,12 @@ from typing import Optional
 
 from fastapi import APIRouter, Query
 
-from app.models.schemas import AnomalyRequest, BiasRequest, DriftRequest
-from app.monitoring.anomaly_detector import AnomalyDetector
-from app.monitoring.bias_detector import BiasDetector
-from app.monitoring.drift_detector import DriftDetector
-from app.services.monitoring_service import MonitoringService
-from app.utils.response import error, success
+from ..models.schemas import AnomalyRequest, BiasRequest, DriftRequest
+from ..monitoring.anomaly_detector import AnomalyDetector
+from ..monitoring.bias_detector import BiasDetector
+from ..monitoring.drift_detector import DriftDetector
+from ..services.monitoring_service import MonitoringService
+from ..utils.response import error, success
 
 router = APIRouter()
 _monitoring = MonitoringService()  # stateless aggregator — safe to share

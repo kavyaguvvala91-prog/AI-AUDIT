@@ -22,9 +22,9 @@ from sklearn.ensemble import IsolationForest
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler
 
-from app.models.schemas import AnomalyResult
-from app.utils.config import settings
-from app.utils.file_utils import load_csv
+from ..models.schemas import AnomalyResult
+from ..utils.config import settings
+from ..utils.file_utils import load_csv
 
 logger = logging.getLogger(__name__)
 

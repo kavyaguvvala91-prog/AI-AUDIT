@@ -19,9 +19,9 @@ Returns:
 
 from fastapi import APIRouter
 
-from app.models.schemas import PredictRequest, PredictResponse
-from app.services.predictor import PredictionService
-from app.utils.response import error, success
+from ..models.schemas import PredictRequest, PredictResponse
+from ..services.predictor import PredictionService
+from ..utils.response import error, success
 
 router = APIRouter()
 _predictor = PredictionService()  # stateless service — safe to share

@@ -18,9 +18,9 @@ from typing import Dict, Tuple
 import numpy as np
 import pandas as pd
 
-from app.models.schemas import DriftResult
-from app.utils.config import settings
-from app.utils.file_utils import load_csv
+from ..models.schemas import DriftResult
+from ..utils.config import settings
+from ..utils.file_utils import load_csv
 
 logger = logging.getLogger(__name__)
 

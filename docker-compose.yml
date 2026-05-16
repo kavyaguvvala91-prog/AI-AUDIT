@@ -1,0 +1,77 @@
+services:
+  mongo:
+    image: mongo:7
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+
+  ai-engine:
+    build:
+      context: .
+      dockerfile: ai-engine/Dockerfile
+    restart: unless-stopped
+    environment:
+      ENV: production
+      HOST: 0.0.0.0
+      PORT: 8000
+      UPLOAD_DIR: uploads
+      MODEL_DIR: saved_models
+      FRONTEND_ORIGINS: http://localhost:5000,http://127.0.0.1:5000
+      TEST_SIZE: ${TEST_SIZE:-0.2}
+      RANDOM_STATE: ${RANDOM_STATE:-42}
+      DRIFT_THRESHOLD: ${DRIFT_THRESHOLD:-0.2}
+      ANOMALY_CONTAMINATION: ${ANOMALY_CONTAMINATION:-0.05}
+      AUTO_FIX_DRIFT_THRESHOLD: ${AUTO_FIX_DRIFT_THRESHOLD:-0.25}
+      AUTO_FIX_IMBALANCE_THRESHOLD: ${AUTO_FIX_IMBALANCE_THRESHOLD:-0.75}
+      AUTO_FIX_MISSING_THRESHOLD: ${AUTO_FIX_MISSING_THRESHOLD:-0.08}
+      AUTO_FIX_APPROVAL_REQUIRED: ${AUTO_FIX_APPROVAL_REQUIRED:-true}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      LLM_TIMEOUT: ${LLM_TIMEOUT:-20}
+      LLM_MAX_TOKENS: ${LLM_MAX_TOKENS:-600}
+    ports:
+      - "8000:8000"
+    volumes:
+      - ai_uploads:/app/ai-engine/uploads
+      - ai_models:/app/ai-engine/saved_models
+
+  backend:
+    build:
+      context: .
+      dockerfile: backend/server/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    restart: unless-stopped
+    depends_on:
+      - mongo
+      - ai-engine
+    environment:
+      PORT: 5000
+      NODE_ENV: production
+      MONGO_URI: mongodb://mongo:27017/ai_audit_dashboard
+      AI_ENGINE_BASE_URL: http://ai-engine:8000
+      UPLOAD_DIR: uploads
+      MAX_FILE_SIZE_MB: 50
+      CORS_ORIGINS: http://localhost:5000,http://127.0.0.1:5000
+      DRIFT_THRESHOLD: ${DRIFT_THRESHOLD:-0.2}
+      AUTO_RETRAIN_ENABLED: ${AUTO_RETRAIN_ENABLED:-true}
+      RETRAIN_INTERVAL_MS: ${RETRAIN_INTERVAL_MS:-60000}
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      GEMINI_API_KEY: ${GEMINI_API_KEY:-}
+      OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
+      GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
+      FRONTEND_DIST_DIR: /app/frontend/dist
+    ports:
+      - "5000:5000"
+    volumes:
+      - backend_uploads:/app/backend/server/uploads
+
+volumes:
+  mongo_data:
+  ai_uploads:
+  ai_models:
+  backend_uploads:

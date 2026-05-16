@@ -1,0 +1,13 @@
+Gender,Married,ApplicantIncome,LoanAmount,Credit_History,Property_Area,Loan_Status
+Female,Yes,7500,170,1,Urban,N
+Female,No,6800,155,1,Urban,N
+Male,Yes,9200,190,1,Urban,Y
+Male,No,6100,145,1,Semiurban,Y
+Female,Yes,8200,175,0,Urban,N
+Male,Yes,9900,210,1,Urban,Y
+Female,No,5400,150,1,Rural,N
+Male,Yes,8700,185,1,Semiurban,Y
+Female,Yes,7600,165,1,Urban,N
+Male,No,5800,138,0,Rural,N
+Female,No,6900,158,1,Semiurban,N
+Male,Yes,9400,205,1,Urban,Y

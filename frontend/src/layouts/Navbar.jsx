@@ -3,10 +3,12 @@ import { useLocation, Link } from 'react-router-dom'
 import { Bell, Settings, ChevronRight } from 'lucide-react'
 
 const breadcrumbs = {
+  '/': ['Overview'],
   '/upload': ['Upload', 'Dataset'],
   '/analysis': ['Analysis', 'Dashboard'],
   '/metrics': ['Model', 'Metrics'],
   '/monitoring': ['AI', 'Monitoring'],
+  '/governance': ['Executive', 'Governance'],
 }
 
 export default function Navbar() {

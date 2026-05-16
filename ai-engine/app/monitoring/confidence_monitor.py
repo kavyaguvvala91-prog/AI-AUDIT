@@ -15,7 +15,7 @@ sklearn models, so the monitor returns a small explanatory summary instead.
 
 from typing import Any, Dict, List
 
-from app.models.schemas import PredictResponse
+from ..models.schemas import PredictResponse
 
 LOW_CONFIDENCE_THRESHOLD = 0.60
 LOW_CONFIDENCE_RATE_ALERT = 0.20

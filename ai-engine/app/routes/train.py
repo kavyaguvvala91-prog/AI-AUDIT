@@ -13,9 +13,9 @@ POST /api/v1/train
 
 from fastapi import APIRouter
 
-from app.models.schemas import TrainRequest, TrainResponse
-from app.services.trainer import ModelTrainer
-from app.utils.response import error, success
+from ..models.schemas import TrainRequest, TrainResponse
+from ..services.trainer import ModelTrainer
+from ..utils.response import error, success
 
 router = APIRouter()
 _trainer = ModelTrainer()  # stateless service — safe to share

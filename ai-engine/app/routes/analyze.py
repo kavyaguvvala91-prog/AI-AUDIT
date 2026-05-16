@@ -17,10 +17,10 @@ from pathlib import Path
 
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
-from app.models.schemas import AnalyseRequest, AnalyseResponse
-from app.services.analyzer import DatasetAnalyzer
-from app.utils.config import settings
-from app.utils.response import error, success
+from ..models.schemas import AnalyseRequest, AnalyseResponse
+from ..services.analyzer import DatasetAnalyzer
+from ..utils.config import settings
+from ..utils.response import error, success
 
 router = APIRouter()
 _analyzer = DatasetAnalyzer()  # stateless — safe to share

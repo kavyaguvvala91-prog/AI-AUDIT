@@ -1,15 +1,5 @@
-/**
- * src/models/Dataset.model.js
- * ────────────────────────────
- * Mongoose schema / model for a dataset record.
- * Stores file metadata + the results returned by the Python AI engine
- * for each analysis type.  All AI result sub-documents are optional —
- * they are populated progressively as different analysis jobs complete.
- */
-
 const mongoose = require("mongoose");
 
-// ── Sub-schema: column statistics returned by the AI engine ──────────────────
 const ColumnStatSchema = new mongoose.Schema(
   {
     name: String,
@@ -24,97 +14,133 @@ const ColumnStatSchema = new mongoose.Schema(
   { _id: false }
 );
 
-// ── Sub-schema: analysis result ───────────────────────────────────────────────
 const AnalysisResultSchema = new mongoose.Schema(
   {
     status: { type: String, enum: ["pending", "running", "completed", "failed"], default: "pending" },
     started_at: Date,
     completed_at: Date,
-    error: String, // error message if status === 'failed'
-    // Flexible payload — each AI task returns different keys
+    error: String,
     payload: { type: mongoose.Schema.Types.Mixed, default: null },
   },
   { _id: false }
 );
 
-// ── Main Dataset Schema ────────────────────────────────────────────────────────
+const ModelVersionSchema = new mongoose.Schema(
+  {
+    modelId: String,
+    version: String,
+    parentModelId: String,
+    modelType: String,
+    problemType: String,
+    targetColumn: String,
+    metrics: { type: mongoose.Schema.Types.Mixed, default: {} },
+    leaderboard: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    createdAt: { type: Date, default: Date.now },
+    source: { type: String, default: "training" },
+  },
+  { _id: false }
+);
+
+const RetrainingLogSchema = new mongoose.Schema(
+  {
+    triggered: Boolean,
+    reason: String,
+    driftScore: Number,
+    threshold: Number,
+    previousModelId: String,
+    newModelId: String,
+    previousVersion: String,
+    newVersion: String,
+    comparison: { type: [mongoose.Schema.Types.Mixed], default: [] },
+    createdAt: { type: Date, default: Date.now },
+  },
+  { _id: false }
+);
+
+const AutoFixHistorySchema = new mongoose.Schema(
+  {
+    createdAt: { type: Date, default: Date.now },
+    approvalGranted: Boolean,
+    executed: Boolean,
+    preparedDatasetPath: String,
+    rollbackVersion: String,
+    rollbackTargetModelId: String,
+    retrainingTriggered: Boolean,
+    executionLogs: { type: [String], default: [] },
+    actions: { type: [mongoose.Schema.Types.Mixed], default: [] },
+  },
+  { _id: false }
+);
+
+const CurrentModelSchema = new mongoose.Schema(
+  {
+    modelId: String,
+    version: String,
+    modelType: String,
+    targetColumn: String,
+    trainedAt: Date,
+  },
+  { _id: false }
+);
+
 const DatasetSchema = new mongoose.Schema(
   {
-    // ── File metadata ─────────────────────────────────────────────
     name: {
       type: String,
       required: [true, "Dataset name is required"],
       trim: true,
-      maxlength: [255, "Dataset name must be ≤ 255 characters"],
+      maxlength: [255, "Dataset name must be <= 255 characters"],
     },
-
-    originalFilename: {
-      type: String,
-      required: true,
-    },
-
-    storedFilename: {
-      type: String,
-      required: true,
-    },
-
-    filePath: {
-      type: String,
-      required: true,
-    },
-
-    fileSizeBytes: {
-      type: Number,
-      required: true,
-    },
-
-    mimeType: {
-      type: String,
-      default: "text/csv",
-    },
-
-    // ── CSV structure info (populated after quick parse on upload) ──
+    originalFilename: { type: String, required: true },
+    storedFilename: { type: String, required: true },
+    filePath: { type: String, required: true },
+    fileSizeBytes: { type: Number, required: true },
+    mimeType: { type: String, default: "text/csv" },
     rowCount: { type: Number, default: 0 },
     columnCount: { type: Number, default: 0 },
     columns: { type: [String], default: [] },
     columnStats: { type: [ColumnStatSchema], default: [] },
-
-    // ── Processing state ──────────────────────────────────────────
     status: {
       type: String,
       enum: ["uploaded", "analysing", "ready", "error"],
       default: "uploaded",
     },
-
-    // ── AI Results (one per analysis type) ───────────────────────
     analysis: { type: AnalysisResultSchema, default: () => ({}) },
     automl: { type: AnalysisResultSchema, default: () => ({}) },
     predictions: { type: AnalysisResultSchema, default: () => ({}) },
     drift: { type: AnalysisResultSchema, default: () => ({}) },
     bias: { type: AnalysisResultSchema, default: () => ({}) },
     anomaly: { type: AnalysisResultSchema, default: () => ({}) },
-
-    // ── Optional user-supplied metadata ──────────────────────────
+    quality: { type: AnalysisResultSchema, default: () => ({}) },
+    explanations: { type: AnalysisResultSchema, default: () => ({}) },
+    retraining: { type: AnalysisResultSchema, default: () => ({}) },
+    simulation: { type: AnalysisResultSchema, default: () => ({}) },
+    remediation: { type: AnalysisResultSchema, default: () => ({}) },
+    governance: { type: AnalysisResultSchema, default: () => ({}) },
+    autoFix: { type: AnalysisResultSchema, default: () => ({}) },
     description: { type: String, trim: true, maxlength: 1000 },
     tags: { type: [String], default: [] },
-    targetColumn: { type: String, trim: true }, // ML target variable
-
-    // ── Soft delete ───────────────────────────────────────────────
+    targetColumn: { type: String, trim: true },
+    autoRetrainEnabled: { type: Boolean, default: true },
+    currentModel: { type: CurrentModelSchema, default: () => ({}) },
+    modelVersions: { type: [ModelVersionSchema], default: [] },
+    retrainingHistory: { type: [RetrainingLogSchema], default: [] },
+    autoFixHistory: { type: [AutoFixHistorySchema], default: [] },
+    rollbackHistory: { type: [mongoose.Schema.Types.Mixed], default: [] },
     isDeleted: { type: Boolean, default: false, select: false },
   },
   {
-    timestamps: true, // adds createdAt & updatedAt automatically
+    timestamps: true,
     toJSON: { virtuals: true },
     toObject: { virtuals: true },
   }
 );
 
-// ── Indexes ────────────────────────────────────────────────────────────────────
 DatasetSchema.index({ status: 1, createdAt: -1 });
 DatasetSchema.index({ tags: 1 });
 DatasetSchema.index({ isDeleted: 1 });
+DatasetSchema.index({ autoRetrainEnabled: 1 });
 
-// ── Virtual: human-readable file size ─────────────────────────────────────────
 DatasetSchema.virtual("fileSizeFormatted").get(function () {
   const bytes = this.fileSizeBytes;
   if (bytes < 1024) return `${bytes} B`;
@@ -122,7 +148,6 @@ DatasetSchema.virtual("fileSizeFormatted").get(function () {
   return `${(bytes / 1024 ** 2).toFixed(2)} MB`;
 });
 
-// ── Pre-find middleware: exclude soft-deleted documents by default ─────────────
 DatasetSchema.pre(/^find/, function (next) {
   this.where({ isDeleted: { $ne: true } });
   next();

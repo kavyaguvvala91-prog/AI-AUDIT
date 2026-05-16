@@ -1,102 +1,91 @@
-"""
-app/monitoring/bias_detector.py
-────────────────────────────────
-BiasDetector: performs a fairness audit by computing per-group outcome rates
-for each sensitive attribute (e.g., gender, race).
-
-Metrics computed per group:
-  • positive_rate  — fraction of rows with the "positive" class / above-median value
-  • count          — number of rows in the group
-  • proportion     — fraction of total dataset
-
-Bias is flagged when the difference in positive_rate between any two groups
-of the same attribute exceeds BIAS_THRESHOLD (10 percentage points by default).
-
-This is a hackathon-friendly implementation of Demographic Parity.
-For production, consider full Fairlearn or AIF360 integration.
-"""
-
 import logging
 from typing import Any, Dict, List
 
-import numpy as np
 import pandas as pd
 
-from app.models.schemas import BiasResult
-from app.utils.file_utils import load_csv
+from ..models.schemas import BiasResult, GroupFairnessMetric
+from ..utils.file_utils import load_csv
 
 logger = logging.getLogger(__name__)
 
-BIAS_THRESHOLD = 0.10  # 10 pp difference triggers a bias flag
+BIAS_THRESHOLD = 0.10
 
 
 class BiasDetector:
-
-    def audit(
-        self,
-        file_path: str,
-        target_column: str,
-        sensitive_attributes: List[str],
-    ) -> BiasResult:
+    def audit(self, file_path: str, target_column: str, sensitive_attributes: List[str]) -> BiasResult:
         df = load_csv(file_path)
 
         if target_column not in df.columns:
             raise ValueError(f"Target column '{target_column}' not found.")
 
-        missing_attrs = [a for a in sensitive_attributes if a not in df.columns]
+        missing_attrs = [attr for attr in sensitive_attributes if attr not in df.columns]
         if missing_attrs:
             raise ValueError(f"Sensitive attribute columns not found: {missing_attrs}")
 
-        # Determine the "positive" outcome threshold
         target = df[target_column]
-        is_numeric_target = pd.api.types.is_numeric_dtype(target)
-        positive_threshold = float(target.median()) if is_numeric_target else None
+        is_numeric = pd.api.types.is_numeric_dtype(target)
+        positive_value = float(target.median()) if is_numeric else target.mode(dropna=True)[0]
 
         group_metrics: Dict[str, Dict[str, Any]] = {}
-        bias_detected = False
+        group_summary: Dict[str, List[GroupFairnessMetric]] = {}
+        max_spread = 0.0
 
         for attr in sensitive_attributes:
-            groups = df.groupby(attr, observed=True)
             attr_metrics: Dict[str, Any] = {}
-
+            summary_rows: List[GroupFairnessMetric] = []
             positive_rates = []
 
-            for group_val, group_df in groups:
-                t = group_df[target_column]
-                if is_numeric_target:
-                    pos_rate = float((t > positive_threshold).mean())
+            for group_value, group_df in df.groupby(attr, observed=True):
+                values = group_df[target_column]
+                if is_numeric:
+                    positive_rate = float((values > positive_value).mean())
                 else:
-                    # For categorical targets, use the modal class as "positive"
-                    modal_class = target.mode()[0]
-                    pos_rate = float((t == modal_class).mean())
-
-                attr_metrics[str(group_val)] = {
+                    positive_rate = float((values == positive_value).mean())
+                positive_rates.append(positive_rate)
+                attr_metrics[str(group_value)] = {
                     "count": int(len(group_df)),
                     "proportion": round(len(group_df) / len(df), 4),
-                    "positive_rate": round(pos_rate, 4),
+                    "positive_rate": round(positive_rate, 4),
                 }
-                positive_rates.append(pos_rate)
 
-            # Check if max spread exceeds threshold
-            if positive_rates:
-                spread = max(positive_rates) - min(positive_rates)
-                attr_metrics["_bias_spread"] = round(spread, 4)
-                attr_metrics["_bias_flagged"] = spread > BIAS_THRESHOLD
-                if spread > BIAS_THRESHOLD:
-                    bias_detected = True
-                    logger.warning(
-                        f"Bias detected in '{attr}': spread={spread:.2%} > threshold={BIAS_THRESHOLD:.2%}"
+            spread = max(positive_rates) - min(positive_rates) if positive_rates else 0.0
+            max_spread = max(max_spread, spread)
+            attr_metrics["_bias_spread"] = round(spread, 4)
+            attr_metrics["_bias_flagged"] = spread > BIAS_THRESHOLD
+
+            for group_value, metrics in attr_metrics.items():
+                if str(group_value).startswith("_"):
+                    continue
+                parity_gap = abs(metrics["positive_rate"] - min(positive_rates)) if positive_rates else 0.0
+                summary_rows.append(
+                    GroupFairnessMetric(
+                        group=str(group_value),
+                        count=metrics["count"],
+                        positive_rate=metrics["positive_rate"],
+                        parity_gap=round(float(parity_gap), 4),
+                        severity=self._severity(parity_gap),
                     )
-
+                )
             group_metrics[attr] = attr_metrics
+            group_summary[attr] = summary_rows
 
-        logger.info(
-            f"Bias audit complete: {len(sensitive_attributes)} attributes, bias_detected={bias_detected}"
-        )
+        fairness_score = max(0.0, round(1 - max_spread, 4))
+        bias_detected = max_spread > BIAS_THRESHOLD
+        severity = self._severity(max_spread)
 
         return BiasResult(
             target_column=target_column,
             sensitive_attributes=sensitive_attributes,
             bias_detected=bias_detected,
+            fairness_score=fairness_score,
+            bias_severity=severity,
             group_metrics=group_metrics,
+            group_summary=group_summary,
         )
+
+    def _severity(self, value: float) -> str:
+        if value >= 0.2:
+            return "high"
+        if value >= 0.1:
+            return "medium"
+        return "low"

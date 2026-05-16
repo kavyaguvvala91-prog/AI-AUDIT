@@ -1,18 +1,40 @@
-.env
 .DS_Store
+Thumbs.db
+.vscode/
+.idea/
 *.log
+npm-debug.log*
+yarn-debug.log*
+pnpm-debug.log*
+
+.env
+.env.*
+!.env.example
+**/.env
+**/.env.*
+!**/.env.example
+
 __pycache__/
 *.py[cod]
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
 
-node_modules/
 venv/
 .venv/
+**/venv/
+**/.venv/
 
-ai-engine/venv/
-ai-engine/saved_models/
-ai-engine/uploads/
+node_modules/
+**/node_modules/
 
-backend/server/uploads/*.csv
-backend/server/uploads/*.txt
+dist/
+build/
+coverage/
+**/dist/
+**/build/
 
-frontend/dist/
+saved_models/
+**/saved_models/
+**/uploads/*
+!backend/server/uploads/.gitkeep

@@ -14,18 +14,15 @@ The route layer stays thin and delegates all orchestration to this service.
 """
 
 import logging
-from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-import joblib
-
-from app.models.schemas import MonitorResult
-from app.monitoring.anomaly_detector import AnomalyDetector
-from app.monitoring.bias_detector import BiasDetector
-from app.monitoring.confidence_monitor import ConfidenceMonitor
-from app.monitoring.drift_detector import DriftDetector
-from app.services.predictor import PredictionService
-from app.utils.config import settings
+from ..models.schemas import MonitorResult
+from ..monitoring.anomaly_detector import AnomalyDetector
+from ..monitoring.bias_detector import BiasDetector
+from ..monitoring.confidence_monitor import ConfidenceMonitor
+from ..monitoring.drift_detector import DriftDetector
+from .model_registry import load_artifacts
+from .predictor import PredictionService
 
 logger = logging.getLogger(__name__)
 
@@ -104,18 +101,7 @@ class MonitoringService:
         """
         if not model_id:
             return {}
-
-        model_dir = settings.MODEL_DIR / model_id
-        model_path = model_dir / "model.joblib"
-        prep_path = model_dir / "preprocessor.joblib"
-
-        if not model_path.exists():
-            raise FileNotFoundError(f"Model not found: {model_id}. Train a model first.")
-        if not prep_path.exists():
-            raise FileNotFoundError(f"Preprocessor not found for model: {model_id}.")
-
-        model = joblib.load(model_path)
-        cleaner = joblib.load(prep_path)
+        model, cleaner, _metadata = load_artifacts(model_id)
 
         if not hasattr(model, "feature_importances_"):
             return {}

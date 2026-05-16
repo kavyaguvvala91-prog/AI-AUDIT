@@ -13,7 +13,7 @@ from pathlib import Path
 from fastapi import APIRouter
 from fastapi.responses import JSONResponse
 
-from app.utils.config import settings
+from ..utils.config import settings
 
 router = APIRouter()
 
