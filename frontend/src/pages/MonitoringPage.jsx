@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react'
+import { Link } from 'react-router-dom'
 import {
   BarChart, Bar, PieChart, Pie, Cell, LineChart, Line,
   XAxis, YAxis, CartesianGrid, Tooltip,
 } from 'recharts'
-import { AlertTriangle, Shield, Zap, TrendingUp, Eye } from 'lucide-react'
+import { AlertTriangle, ArrowRight, Shield, ShieldAlert, ShieldCheck, Zap, TrendingUp, Eye } from 'lucide-react'
 import SectionHeader from '../components/SectionHeader.jsx'
 import StatCard from '../components/StatCard.jsx'
 import Badge from '../components/Badge.jsx'
@@ -43,6 +44,97 @@ const emptyMonitoring = {
   target_column: null,
   reference_dataset_id: null,
   prediction_summary: {},
+}
+
+const buildGovernanceActions = (monitoring) => {
+  const actions = []
+
+  if (monitoring.drift_detected || monitoring.drift_score >= monitoring.drift_threshold) {
+    actions.push({
+      key: 'drift',
+      severity: 'danger',
+      title: 'Refresh the production baseline and retrain the model',
+      detail: `Drift is at ${pct(monitoring.drift_score)} against a threshold of ${pct(monitoring.drift_threshold)}.`,
+    })
+  }
+
+  if (monitoring.bias_detected) {
+    actions.push({
+      key: 'bias',
+      severity: 'warning',
+      title: 'Review fairness gaps before promoting the current model',
+      detail: monitoring.bias_features.length
+        ? `Focus on ${monitoring.bias_features.join(', ')} and confirm parity improves after remediation.`
+        : 'Protected-group disparities are visible and need a targeted fairness check.',
+    })
+  }
+
+  if (monitoring.low_confidence_rate >= 0.08 || monitoring.low_confidence_count >= 25) {
+    actions.push({
+      key: 'confidence',
+      severity: 'warning',
+      title: 'Send low-confidence cases to manual review',
+      detail: `${monitoring.low_confidence_count} rows are currently below the confidence comfort band.`,
+    })
+  }
+
+  if (monitoring.anomaly_rate >= 0.02 || monitoring.anomaly_count >= 10) {
+    actions.push({
+      key: 'anomaly',
+      severity: 'warning',
+      title: 'Quarantine anomalous records before scoring downstream systems',
+      detail: `${monitoring.anomaly_count} anomalies were detected in the latest monitoring run.`,
+    })
+  }
+
+  if (actions.length === 0) {
+    actions.push({
+      key: 'stable',
+      severity: 'success',
+      title: 'Governance posture is currently stable',
+      detail: 'Keep baseline comparisons, fairness checks, and confidence monitoring on the current cadence.',
+    })
+  }
+
+  return actions
+}
+
+const getGovernanceSummary = (monitoring) => {
+  const weightedRisk =
+    (monitoring.drift_score * 45) +
+    (monitoring.bias_score * 25) +
+    (monitoring.low_confidence_rate * 20) +
+    (Math.min(monitoring.anomaly_rate, 0.2) * 50)
+
+  const score = Math.max(0, Math.min(100, Math.round(100 - (weightedRisk * 100))))
+
+  if (score >= 78) {
+    return {
+      score,
+      level: 'Stable',
+      variant: 'success',
+      icon: ShieldCheck,
+      description: 'The model is operating inside the expected guardrails. Keep observing trend movement and rerun checks after new data arrives.',
+    }
+  }
+
+  if (score >= 55) {
+    return {
+      score,
+      level: 'Watch',
+      variant: 'warning',
+      icon: Shield,
+      description: 'Some governance signals need follow-up. A review of fairness, confidence, or drift should happen before the next promotion decision.',
+    }
+  }
+
+  return {
+    score,
+    level: 'Action Required',
+    variant: 'danger',
+    icon: ShieldAlert,
+    description: 'Monitoring has crossed one or more governance limits. Treat the current model as review-only until mitigation steps are complete.',
+  }
 }
 
 export default function MonitoringPage() {
@@ -88,6 +180,9 @@ export default function MonitoringPage() {
   const hasFairnessGroups = Array.isArray(data.fairness_groups) && data.fairness_groups.length > 0
   const hasSuspiciousPredictions = Array.isArray(data.suspicious_predictions) && data.suspicious_predictions.length > 0
   const predictionMix = Object.entries(data.prediction_summary?.value_counts || {})
+  const governanceActions = buildGovernanceActions(data)
+  const governanceSummary = getGovernanceSummary(data)
+  const GovernanceIcon = governanceSummary.icon
 
   return (
     <div className="space-y-8 animate-fade-in">
@@ -154,6 +249,74 @@ export default function MonitoringPage() {
           icon={Shield}
           accent={data.bias_detected}
         />
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[0.95fr_1.05fr] gap-4">
+        <div className="bg-panel border border-border rounded-lg p-5 space-y-4">
+          <div className="flex items-start justify-between gap-4">
+            <div>
+              <p className="text-xs font-mono text-textDim uppercase tracking-widest">Governance Readiness</p>
+              <h3 className="mt-2 font-display text-2xl text-text">{governanceSummary.level}</h3>
+            </div>
+            <div className={`rounded-full p-3 ${
+              governanceSummary.variant === 'success'
+                ? 'bg-success/10 text-success border border-success/30'
+                : governanceSummary.variant === 'warning'
+                  ? 'bg-warning/10 text-warning border border-warning/30'
+                  : 'bg-danger/10 text-danger border border-danger/30'
+            }`}>
+              <GovernanceIcon size={18} />
+            </div>
+          </div>
+
+          <div className="rounded-lg border border-border bg-surface px-4 py-3">
+            <div className="text-xs font-mono text-textDim uppercase tracking-[0.2em]">Governance Score</div>
+            <div className="mt-2 flex items-end gap-3">
+              <span className="font-display text-4xl text-text">{governanceSummary.score}</span>
+              <span className="text-sm text-textDim">/100</span>
+            </div>
+          </div>
+
+          <p className="text-sm text-textDim leading-7">{governanceSummary.description}</p>
+
+          <div className="flex flex-wrap gap-2">
+            {data.drift_detected && <Badge variant="danger">Drift breach</Badge>}
+            {data.bias_detected && <Badge variant="warning">Fairness review</Badge>}
+            {data.low_confidence_count > 0 && <Badge variant="accent">Human review pressure</Badge>}
+            {data.anomaly_count > 0 && <Badge variant="warning">Anomaly handling</Badge>}
+          </div>
+        </div>
+
+        <div className="bg-panel border border-border rounded-lg p-5">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <p className="text-xs font-mono text-textDim uppercase tracking-widest">Governance Actions</p>
+              <h3 className="mt-2 font-display text-text text-xl">What to do next</h3>
+              <p className="mt-1 text-sm text-textDim">
+                These actions translate the monitoring signals into governance decisions and remediation work.
+              </p>
+            </div>
+            <Link
+              to="/governance"
+              className="inline-flex items-center gap-2 rounded-md border border-accent/30 bg-accent/10 px-4 py-2 text-sm text-accent"
+            >
+              Open Governance
+              <ArrowRight size={14} />
+            </Link>
+          </div>
+
+          <div className="mt-4 space-y-3">
+            {governanceActions.map((action) => (
+              <div key={action.key} className="rounded-lg border border-border bg-surface p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="font-display text-text">{action.title}</div>
+                  <Badge variant={action.severity}>{action.severity === 'danger' ? 'High' : action.severity === 'warning' ? 'Medium' : 'Stable'}</Badge>
+                </div>
+                <p className="mt-2 text-sm text-textDim leading-6">{action.detail}</p>
+              </div>
+            ))}
+          </div>
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

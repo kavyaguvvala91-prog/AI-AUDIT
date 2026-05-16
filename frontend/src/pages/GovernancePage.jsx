@@ -48,10 +48,108 @@ const providerLabel = {
   'rule-based': 'Rule-based',
 }
 
+const solutionBlueprints = {
+  drift_retrain: {
+    owner: 'MLOps + Data Science',
+    timeline: 'Next 24 hours',
+    validation: 'Drift score falls below threshold and refreshed model outperforms the current champion.',
+    checklist: [
+      'Rebuild the reference baseline from the latest trusted cohort.',
+      'Retrain with fresh labelled data and compare against the current production model.',
+      'Promote only after drift and metric checks both pass.',
+    ],
+  },
+  quality_cleanup: {
+    owner: 'Data Engineering',
+    timeline: 'Before next training run',
+    validation: 'Missing-value, outlier, and invalid-row rates return to the acceptable quality band.',
+    checklist: [
+      'Patch missing values and standardize the fields with high variance.',
+      'Remove or quarantine malformed records before they reach training.',
+      'Re-run quality scoring and confirm readiness before retraining.',
+    ],
+  },
+  bias_rebalance: {
+    owner: 'Responsible AI + Modeling',
+    timeline: 'Before release approval',
+    validation: 'Parity gaps shrink across sensitive groups without unacceptable performance loss.',
+    checklist: [
+      'Rebalance the training sample or adjust thresholds for impacted groups.',
+      'Run fairness evaluation on the repaired model and compare by group.',
+      'Document the fairness trade-offs before shipping the new version.',
+    ],
+  },
+}
+
+const defaultSolutionBlueprint = {
+  owner: 'Model Governance Team',
+  timeline: 'As soon as practical',
+  validation: 'Risk score and supporting evidence improve after remediation is applied.',
+  checklist: [
+    'Investigate the root cause behind the alert.',
+    'Apply the recommended mitigation and record the change.',
+    'Re-run monitoring before closing the incident.',
+  ],
+}
+
 const formatTimestamp = (value) => {
   if (!value) return 'Live'
   const date = new Date(value)
   return Number.isNaN(date.getTime()) ? String(value) : date.toLocaleString()
+}
+
+const buildSolutionCards = (data) => {
+  const recommendations = data.recommendations || []
+  const monitoring = data.monitoring || {}
+
+  if (recommendations.length > 0) {
+    return recommendations.map((item) => {
+      const blueprint = solutionBlueprints[item.code] || defaultSolutionBlueprint
+      return {
+        ...item,
+        owner: blueprint.owner,
+        timeline: blueprint.timeline,
+        validation: blueprint.validation,
+        checklist: blueprint.checklist,
+      }
+    })
+  }
+
+  const fallback = []
+
+  if (monitoring.drift?.drifted) {
+    fallback.push({
+      code: 'drift_followup',
+      title: 'Production drift needs intervention',
+      severity: monitoring.drift.severity || 'high',
+      risk_score: Math.round((monitoring.drift.score || 0) * 100),
+      rationale: 'Feature distributions are moving away from the established baseline.',
+      recommended_action: 'Refresh the baseline, retrain on newer data, and validate the new model before release.',
+      auto_fix_available: false,
+      owner: 'MLOps + Data Science',
+      timeline: 'Next 24 hours',
+      validation: 'Drift returns below the accepted threshold.',
+      checklist: defaultSolutionBlueprint.checklist,
+    })
+  }
+
+  if (monitoring.bias?.bias_detected) {
+    fallback.push({
+      code: 'fairness_followup',
+      title: 'Fairness risk needs targeted remediation',
+      severity: monitoring.bias.severity || 'medium',
+      risk_score: Math.round((1 - (monitoring.bias.fairness_score || 0.8)) * 100),
+      rationale: 'Protected-group parity has moved outside the acceptable range.',
+      recommended_action: 'Audit the affected groups, rebalance the training set, and retest before promotion.',
+      auto_fix_available: false,
+      owner: 'Responsible AI + Modeling',
+      timeline: 'Before release approval',
+      validation: 'Parity gaps improve without severe performance regression.',
+      checklist: defaultSolutionBlueprint.checklist,
+    })
+  }
+
+  return fallback
 }
 
 export default function GovernancePage() {
@@ -100,6 +198,14 @@ export default function GovernancePage() {
   const pipeline = data.pipeline || []
   const autoFixAvailable = data.auto_fix?.available_count || 0
   const insights = data.insights || {}
+  const solutionCards = buildSolutionCards(data)
+  const immediatePlan = solutionCards.slice(0, 3).map((item, index) => ({
+    step: index + 1,
+    title: item.title,
+    action: item.recommended_action,
+    owner: item.owner,
+    timeline: item.timeline,
+  }))
 
   const handleDownload = async (format) => {
     if (!datasetId) {
@@ -286,6 +392,133 @@ export default function GovernancePage() {
           </div>
         </div>
       )}
+
+      <div className="grid grid-cols-1 xl:grid-cols-[1.1fr_0.9fr] gap-4">
+        <div className="bg-panel border border-border rounded-lg p-5">
+          <div className="flex items-center justify-between gap-3 mb-4">
+            <div>
+              <div className="flex items-center gap-2">
+                <Wrench size={16} className="text-accent" />
+                <span className="font-display text-text">Solutions for Current Problems</span>
+              </div>
+              <div className="mt-1 text-xs text-textDim font-mono">
+                Concrete remediation plans for the governance issues currently affecting this model.
+              </div>
+            </div>
+            <Badge variant={solutionCards.length ? 'warning' : 'success'}>
+              {solutionCards.length ? `${solutionCards.length} solution plans` : 'No open issues'}
+            </Badge>
+          </div>
+
+          <div className="space-y-4">
+            {solutionCards.length ? solutionCards.map((item) => (
+              <div key={item.code} className="rounded-lg border border-border bg-surface p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <div className="font-display text-text">{item.title}</div>
+                    <div className="mt-1 text-xs font-mono text-textDim">Problem code: {item.code}</div>
+                  </div>
+                  <Badge variant={severityVariant[item.severity] || 'warning'}>
+                    {item.severity}
+                  </Badge>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-2 gap-4 text-sm">
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.2em] text-textDim font-mono">Problem</div>
+                    <p className="mt-2 text-textDim leading-6">{item.rationale}</p>
+                  </div>
+                  <div>
+                    <div className="text-xs uppercase tracking-[0.2em] text-textDim font-mono">Solution</div>
+                    <p className="mt-2 text-text leading-6">{item.recommended_action}</p>
+                  </div>
+                </div>
+
+                <div className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 text-xs font-mono">
+                  <div className="rounded-md border border-border px-3 py-3">
+                    <div className="text-textDim">Owner</div>
+                    <div className="mt-1 text-text">{item.owner}</div>
+                  </div>
+                  <div className="rounded-md border border-border px-3 py-3">
+                    <div className="text-textDim">Target Window</div>
+                    <div className="mt-1 text-text">{item.timeline}</div>
+                  </div>
+                  <div className="rounded-md border border-border px-3 py-3">
+                    <div className="text-textDim">Risk Score</div>
+                    <div className="mt-1 text-text">{item.risk_score}/100</div>
+                  </div>
+                </div>
+
+                <div className="mt-4 rounded-md border border-border bg-panel px-4 py-3">
+                  <div className="text-xs uppercase tracking-[0.2em] text-textDim font-mono">How to validate the fix</div>
+                  <p className="mt-2 text-sm text-textDim leading-6">{item.validation}</p>
+                </div>
+
+                <div className="mt-4">
+                  <div className="text-xs uppercase tracking-[0.2em] text-textDim font-mono">Execution checklist</div>
+                  <div className="mt-3 space-y-2">
+                    {item.checklist.map((step) => (
+                      <div key={step} className="flex items-start gap-3 rounded-md border border-border px-3 py-3">
+                        <span className="mt-1 h-1.5 w-1.5 rounded-full bg-accent" />
+                        <span className="text-sm text-textDim leading-6">{step}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {item.auto_fix_available && (
+                  <div className="mt-4">
+                    <Badge variant="accent">Auto-fix available for part of this workflow</Badge>
+                  </div>
+                )}
+              </div>
+            )) : (
+              <div className="text-sm text-textDim">No active governance issues need remediation right now.</div>
+            )}
+          </div>
+        </div>
+
+        <div className="bg-panel border border-border rounded-lg p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <Sparkles size={16} className="text-warning" />
+            <span className="font-display text-text">Immediate Response Plan</span>
+          </div>
+          <p className="text-sm text-textDim leading-7">
+            Use this sequence when the monitoring signals on the current model need action before release or continued production use.
+          </p>
+
+          <div className="mt-5 space-y-3">
+            {immediatePlan.length ? immediatePlan.map((item) => (
+              <div key={item.step} className="rounded-lg border border-border bg-surface p-4">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="flex items-center gap-3">
+                    <div className="h-8 w-8 rounded-full border border-accent/30 bg-accent/10 flex items-center justify-center text-accent font-mono text-xs">
+                      0{item.step}
+                    </div>
+                    <div className="font-display text-text">{item.title}</div>
+                  </div>
+                  <Badge variant="default">{item.timeline}</Badge>
+                </div>
+                <p className="mt-3 text-sm text-textDim leading-6">{item.action}</p>
+                <div className="mt-3 text-xs font-mono text-textDim">Owner: {item.owner}</div>
+              </div>
+            )) : (
+              <div className="rounded-lg border border-success/20 bg-success/10 p-4 text-sm text-textDim">
+                No urgent response plan is needed. The current governance signals are inside the expected operating band.
+              </div>
+            )}
+          </div>
+
+          <div className="mt-5 pt-4 border-t border-border">
+            <div className="text-xs uppercase tracking-[0.2em] text-textDim font-mono mb-3">Release Gate</div>
+            <div className="space-y-2 text-sm text-textDim">
+              <div>1. Confirm drift, fairness, and quality checks pass after remediation.</div>
+              <div>2. Compare the remediated model against the current version using the same evaluation slice.</div>
+              <div>3. Publish only when the risk score drops and validation evidence is attached.</div>
+            </div>
+          </div>
+        </div>
+      </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-2 gap-4">
         <ChartPanel title="Drift Trend">
@@ -517,6 +750,9 @@ export default function GovernancePage() {
               <div className="mt-2 text-xs font-mono text-textDim">Risk score {item.risk_score}/100</div>
               <p className="mt-3 text-sm text-textDim">{item.rationale}</p>
               <p className="mt-3 text-sm text-text">{item.recommended_action}</p>
+              <div className="mt-3 text-xs font-mono text-textDim">
+                Owner: {(solutionBlueprints[item.code] || defaultSolutionBlueprint).owner} • Target: {(solutionBlueprints[item.code] || defaultSolutionBlueprint).timeline}
+              </div>
               {item.auto_fix_available && (
                 <div className="mt-3">
                   <Badge variant="accent">auto-fix available</Badge>
