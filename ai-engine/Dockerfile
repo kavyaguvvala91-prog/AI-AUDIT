@@ -5,13 +5,13 @@ ENV PYTHONUNBUFFERED=1
 
 WORKDIR /app/ai-engine
 
-COPY ai-engine/requirements.txt ./requirements.txt
+COPY requirements.txt ./requirements.txt
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY ai-engine/ ./
+COPY . ./
 
 RUN mkdir -p uploads saved_models
 
 EXPOSE 8000
 
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+CMD ["sh", "-c", "uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]

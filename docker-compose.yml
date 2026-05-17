@@ -9,8 +9,8 @@ services:
 
   ai-engine:
     build:
-      context: .
-      dockerfile: ai-engine/Dockerfile
+      context: ./ai-engine
+      dockerfile: Dockerfile
     restart: unless-stopped
     environment:
       ENV: production
@@ -18,7 +18,7 @@ services:
       PORT: 8000
       UPLOAD_DIR: uploads
       MODEL_DIR: saved_models
-      FRONTEND_ORIGINS: http://localhost:5000,http://127.0.0.1:5000
+      FRONTEND_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://localhost:5000,http://127.0.0.1:5000
       TEST_SIZE: ${TEST_SIZE:-0.2}
       RANDOM_STATE: ${RANDOM_STATE:-42}
       DRIFT_THRESHOLD: ${DRIFT_THRESHOLD:-0.2}
@@ -43,8 +43,6 @@ services:
     build:
       context: .
       dockerfile: backend/server/Dockerfile
-      args:
-        VITE_API_BASE_URL: /api/v1
     restart: unless-stopped
     depends_on:
       - mongo
@@ -56,7 +54,7 @@ services:
       AI_ENGINE_BASE_URL: http://ai-engine:8000
       UPLOAD_DIR: uploads
       MAX_FILE_SIZE_MB: 50
-      CORS_ORIGINS: http://localhost:5000,http://127.0.0.1:5000
+      CORS_ORIGINS: http://localhost:3000,http://127.0.0.1:3000,http://localhost:5000,http://127.0.0.1:5000
       DRIFT_THRESHOLD: ${DRIFT_THRESHOLD:-0.2}
       AUTO_RETRAIN_ENABLED: ${AUTO_RETRAIN_ENABLED:-true}
       RETRAIN_INTERVAL_MS: ${RETRAIN_INTERVAL_MS:-60000}
@@ -64,11 +62,22 @@ services:
       GEMINI_API_KEY: ${GEMINI_API_KEY:-}
       OPENAI_MODEL: ${OPENAI_MODEL:-gpt-4.1-mini}
       GEMINI_MODEL: ${GEMINI_MODEL:-gemini-1.5-flash}
-      FRONTEND_DIST_DIR: /app/frontend/dist
     ports:
       - "5000:5000"
     volumes:
       - backend_uploads:/app/backend/server/uploads
+
+  frontend:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+      args:
+        VITE_API_BASE_URL: /api/v1
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "3000:80"
 
 volumes:
   mongo_data:
