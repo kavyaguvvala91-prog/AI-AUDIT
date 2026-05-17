@@ -106,11 +106,18 @@ export default function UploadPage() {
       })
       setTimeout(() => navigate('/governance'), 1200)
     } catch (err) {
+      localStorage.removeItem('currentDatasetId')
+      localStorage.removeItem('currentReferenceDatasetId')
+      localStorage.removeItem('currentTargetColumn')
+      localStorage.removeItem('currentModelId')
+
+      setFile(null)
+      setProgress(100)
       setStatus({
-        type: 'error',
-        message: err?.response?.data?.message || 'Demo dataset launch failed. Please check the backend services and try again.',
+        type: 'warning',
+        message: 'Live demo service is unavailable, opening the built-in demo dashboard instead.',
       })
-      setProgress(0)
+      setTimeout(() => navigate('/governance'), 1200)
     } finally {
       setUploading(false)
     }
