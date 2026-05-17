@@ -1,0 +1,47 @@
+services:
+  - type: web
+    name: ai-audit-dashboard-backend
+    runtime: node
+    plan: free
+    branch: main
+    rootDir: backend/server
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/v1/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: PORT
+        value: 10000
+      - key: MONGO_URI
+        sync: false
+      - key: AI_ENGINE_BASE_URL
+        value: https://ai-audit-production-2aa8.up.railway.app
+      - key: AI_ENGINE_URL
+        value: https://ai-audit-production-2aa8.up.railway.app
+      - key: FRONTEND_URL
+        value: https://example.vercel.app
+      - key: CORS_ORIGINS
+        value: https://example.vercel.app
+      - key: UPLOAD_DIR
+        value: uploads
+      - key: MAX_FILE_SIZE_MB
+        value: 50
+      - key: DRIFT_THRESHOLD
+        value: 0.2
+      - key: AUTO_RETRAIN_ENABLED
+        value: true
+      - key: RETRAIN_INTERVAL_MS
+        value: 60000
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: OPENAI_MODEL
+        value: gpt-4.1-mini
+      - key: GEMINI_MODEL
+        value: gemini-1.5-flash
+      - key: FRONTEND_DIST_DIR
+        value: ""
