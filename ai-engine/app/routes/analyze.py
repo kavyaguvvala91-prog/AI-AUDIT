@@ -48,6 +48,37 @@ async def analyse_dataset(request: AnalyseRequest):
         return error(f"Analysis failed: {exc}", "ANALYSIS_ERROR", 500)
 
 
+@router.post("/files/upload", response_model=None)
+async def upload_file(file: UploadFile = File(...)):
+    """
+    Save a CSV file to the AI engine's local uploads directory and return
+    the saved path so follow-up endpoints can operate on the same file.
+    """
+    if not file.filename.endswith((".csv", ".txt")):
+        raise HTTPException(422, "Only CSV files are accepted.")
+
+    dest = settings.UPLOAD_DIR / f"{uuid.uuid4()}-{file.filename}"
+    dest.parent.mkdir(parents=True, exist_ok=True)
+
+    try:
+        with dest.open("wb") as f:
+            shutil.copyfileobj(file.file, f)
+
+        return success(
+            data={
+                "file_path": str(dest),
+                "filename": file.filename,
+            },
+            message="File uploaded successfully",
+            status_code=201,
+        )
+    except Exception as exc:
+        dest.unlink(missing_ok=True)
+        return error(f"Upload failed: {exc}", "UPLOAD_ERROR", 500)
+    finally:
+        file.file.close()
+
+
 @router.post("/analyse/upload", response_model=None)
 async def analyse_upload(file: UploadFile = File(...)):
     """
